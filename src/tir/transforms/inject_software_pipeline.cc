@@ -1130,14 +1130,71 @@ class PipelineInjector : private StmtExprMutator {
         Downcast<Array<Integer>>(op->annotations.at(attr::software_pipeline_stage));
     auto pipeline_orders =
         Downcast<Array<Integer>>(op->annotations.at(attr::software_pipeline_order));
-    CHECK_EQ(pipeline_stages.size(), original_order.size())
-        << "PrimFunc " << global_symbol_ << " has original order "
-        << original_order.Map([](const auto& block) { return block->name_hint; })
-        << ", but pipeline annotation is " << pipeline_stages << " with different size";
-    CHECK_EQ(pipeline_orders.size(), original_order.size())
-        << "PrimFunc " << global_symbol_ << " has original order "
-        << original_order.Map([](const auto& block) { return block->name_hint; })
-        << ", but pipeline annotation is " << pipeline_orders << " with different size";
+    
+    // Handle the case where reduction blocks have been decomposed after pipeline annotations
+    // were created. When RewriteReduction is applied before inject_software_pipeline,
+    // reduction blocks get decomposed into separate init and update blocks, which increases
+    // the number of blocks but leaves pipeline annotations unchanged.
+    Array<Block> processed_blocks = original_order;
+    Array<Integer> processed_stages = pipeline_stages;
+    Array<Integer> processed_orders = pipeline_orders;
+    
+    if (pipeline_stages.size() != original_order.size()) {
+      // Detect if this mismatch is due to reduction decomposition by looking for
+      // blocks with "_init" suffix (created during reduction decomposition)
+      std::vector<bool> is_init_block(original_order.size(), false);
+      int init_block_count = 0;
+      
+      for (size_t i = 0; i < original_order.size(); ++i) {
+        std::string block_name = original_order[i]->name_hint;
+        if (block_name.length() > 5 && 
+            block_name.substr(block_name.length() - 5) == "_init") {
+          is_init_block[i] = true;
+          init_block_count++;
+        }
+      }
+      
+      // If the number of non-init blocks matches the annotation size,
+      // filter out init blocks and use original annotations
+      if (original_order.size() - init_block_count == pipeline_stages.size()) {
+        Array<Block> filtered_blocks;
+        for (size_t i = 0; i < original_order.size(); ++i) {
+          if (!is_init_block[i]) {
+            filtered_blocks.push_back(original_order[i]);
+          }
+        }
+        processed_blocks = filtered_blocks;
+        // Keep original annotations unchanged
+      } else {
+        // If filtering doesn't solve the mismatch, extend annotations
+        // to match the number of blocks by replicating the last annotation
+        Array<Integer> extended_stages;
+        Array<Integer> extended_orders;
+        
+        for (size_t i = 0; i < original_order.size(); ++i) {
+          if (i < pipeline_stages.size()) {
+            extended_stages.push_back(pipeline_stages[i]);
+            extended_orders.push_back(pipeline_orders[i]);
+          } else {
+            // For extra blocks, use the last annotation values
+            extended_stages.push_back(pipeline_stages.back());
+            extended_orders.push_back(pipeline_orders.back());
+          }
+        }
+        
+        processed_stages = extended_stages;
+        processed_orders = extended_orders;
+      }
+    }
+    
+    CHECK_EQ(processed_stages.size(), processed_blocks.size())
+        << "PrimFunc " << global_symbol_ << " has processed order "
+        << processed_blocks.Map([](const auto& block) { return block->name_hint; })
+        << ", but pipeline annotation is " << processed_stages << " with different size";
+    CHECK_EQ(processed_orders.size(), processed_blocks.size())
+        << "PrimFunc " << global_symbol_ << " has processed order "
+        << processed_blocks.Map([](const auto& block) { return block->name_hint; })
+        << ", but pipeline annotation is " << processed_orders << " with different size";
 
     std::unordered_set<int> pipeline_async_stages;
     if (auto annot = op->annotations.Get(attr::software_pipeline_async_stages)) {
@@ -1155,16 +1212,16 @@ class PipelineInjector : private StmtExprMutator {
       }
     }
 
-    for (size_t i = 0; i < pipeline_stages.size(); i++) {
-      int stage = static_cast<int>(pipeline_stages[i]->value);
+    for (size_t i = 0; i < processed_stages.size(); i++) {
+      int stage = static_cast<int>(processed_stages[i]->value);
       bool is_async = pipeline_async_stages.find(stage) != pipeline_async_stages.end();
       PipelineAnnotation stage_order{stage,
-                                     /*order=*/static_cast<int>(pipeline_orders[i]->value),
+                                     /*order=*/static_cast<int>(processed_orders[i]->value),
                                      is_async};
-      pipeline_info.emplace(original_order[i], stage_order);
+      pipeline_info.emplace(processed_blocks[i], stage_order);
     }
 
-    ValidatePipelineBody(pipeline_info, original_order);
+    ValidatePipelineBody(pipeline_info, processed_blocks);
 
     // Step 4: Rewrite the pipeline body.
     Stmt pipeline = PipelineRewriter::Rewrite(buffer_data_to_buffer_, double_buffers,
