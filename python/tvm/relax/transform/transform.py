@@ -1182,7 +1182,7 @@ def RealizeVDevice() -> tvm.ir.transform.Pass:
 
 
 def MetaScheduleApplyDatabase(
-    work_dir: Optional[str] = None, enable_warning: bool = False
+    work_dir: Optional[str] = None, dyn_mod = None, enable_warning: bool = False
 ) -> tvm.ir.transform.Pass:
     """Apply the best schedule from tuning database.
 
@@ -1200,7 +1200,7 @@ def MetaScheduleApplyDatabase(
     ret : tvm.transform.Pass
         The registered pass
     """
-    return _ffi_api.MetaScheduleApplyDatabase(work_dir, enable_warning)  # type: ignore
+    return _ffi_api.MetaScheduleApplyDatabase(work_dir, dyn_mod, enable_warning)  # type: ignore
 
 
 def MetaScheduleTuneTIR(

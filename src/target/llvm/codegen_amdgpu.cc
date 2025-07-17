@@ -283,7 +283,7 @@ runtime::Module BuildAMDGPU(IRModule mod, Target target) {
 
   for (auto& bitcode_path : bitcode_files) {
     std::unique_ptr<llvm::Module> mlib = llvm_instance.LoadIR(bitcode_path);
-    mlib->setTargetTriple(llvm_target->GetTargetTriple());
+    mlib->setTargetTriple(llvm::Triple(llvm_target->GetTargetTriple()));
     mlib->setDataLayout(tm->createDataLayout());
 
     for (llvm::Function& f : mlib->functions()) {

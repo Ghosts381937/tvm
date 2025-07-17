@@ -334,7 +334,7 @@ runtime::Module BuildNVPTX(IRModule mod, Target target) {
     std::string path = (*flibdevice_path)(compute_ver);
     if (path.length() != 0) {
       std::unique_ptr<llvm::Module> mlib = llvm_instance.LoadIR(path);
-      mlib->setTargetTriple(llvm_target->GetTargetTriple());
+      mlib->setTargetTriple(llvm::Triple(llvm_target->GetTargetTriple()));
       mlib->setDataLayout(tm->createDataLayout());
       cg->AddLinkModule(std::move(mlib));
     }

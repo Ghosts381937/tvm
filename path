@@ -1,0 +1,4 @@
+export TVM_HOME=/home/kangwei/Documents/Documents/mlc_llm/tvm
+export PYTHONPATH=$TVM_HOME/python:$PYTHONPATH
+export LD_LIBRARY_PATH=$TVM_HOME/build:$LD_LIBRARY_PATH
+export CPLUS_INCLUDE_PATH=$TVM_HOME/include:$TVM_HOME/3rdparty/dmlc-core/include:$TVM_HOME/3rdparty/rang/include:$TVM_HOME/3rdparty/dlpack/include:$CPLUS_INCLUDE_PATH

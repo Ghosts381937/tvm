@@ -530,7 +530,7 @@ void ProcessLLVMOptions(const std::vector<std::string>& llvm_vec) {
 runtime::Module BuildHexagon(IRModule mod, Target target) {
   LLVMInstance llvm_instance;
   With<LLVMTarget> llvm_target(llvm_instance, target);
-
+  LOG(INFO) << "Building Hexagon module with target: " << target->GetAttr<String>(tvm::attr::kTarget);
   auto split = [](const std::string& str, char delim = ' ') {
     std::vector<std::string> vec;
     std::string tmp;
@@ -601,7 +601,6 @@ runtime::Module BuildHexagon(IRModule mod, Target target) {
 
   auto EmitToString = [&llvm_target](const llvm::Module& m, CodeGenFileType cgft) {
     std::string out;
-
     if (cgft == IR || cgft == BC) {
       llvm::raw_string_ostream os(out);
       if (cgft == IR)

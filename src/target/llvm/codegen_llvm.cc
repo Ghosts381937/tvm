@@ -166,7 +166,7 @@ void CodeGenLLVM::SetFastMathFlags(llvm::FastMathFlags fmf) { builder_->setFastM
 
 void CodeGenLLVM::InitTarget() {
   llvm::TargetMachine* tm = llvm_target_->GetOrCreateTargetMachine();
-  module_->setTargetTriple(tm->getTargetTriple().str());
+  module_->setTargetTriple(llvm::Triple(tm->getTargetTriple()));
   module_->setDataLayout(tm->createDataLayout());
 #if TVM_LLVM_VERSION >= 200
   data_layout_.reset(new llvm::DataLayout(module_.get()->getDataLayout()));
@@ -385,7 +385,7 @@ void CodeGenLLVM::HandleImport(const std::string& code) {
     mlib = llvm_target_->GetInstance().ParseIR(code);
   }
 
-  mlib->setTargetTriple(llvm_target_->GetTargetTriple());
+  mlib->setTargetTriple(llvm::Triple(llvm_target_->GetTargetTriple()));
   mlib->setDataLayout(llvm_target_->GetOrCreateTargetMachine()->createDataLayout());
   // mark all the functions as force inline
   for (llvm::Function& f : mlib->functions()) {

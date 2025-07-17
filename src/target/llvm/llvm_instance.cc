@@ -928,7 +928,7 @@ std::string LLVMTarget::GetTargetMetadata(const llvm::Module& module) {
       return meta.str();
     }
   }
-  return "llvm -mtriple " + module.getTargetTriple();
+  return "llvm -mtriple " + module.getTargetTriple().str();
 }
 
 void LLVMTarget::SetTargetMetadata(llvm::Module* module) const {

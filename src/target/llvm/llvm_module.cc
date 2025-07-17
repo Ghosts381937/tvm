@@ -440,7 +440,7 @@ void LLVMModuleNode::InitMCJIT() {
   // create MCJIT
   mcjit_ee_ = builder.create(tm.release());
   ICHECK(mcjit_ee_ != nullptr) << "Failed to initialize LLVM MCJIT engine for "
-                               << module_->getTargetTriple();
+                               << module_->getTargetTriple().str();
 
   VLOG(2) << "LLVM MCJIT execute " << module_->getModuleIdentifier() << " for triple `"
           << llvm_target->GetTargetTriple() << "`"
@@ -514,12 +514,11 @@ void LLVMModuleNode::InitORCJIT() {
 #if TVM_LLVM_VERSION >= 130
   // linker
   const auto linkerBuilder =
-      [&](llvm::orc::ExecutionSession& session,
-          const llvm::Triple& triple) -> std::unique_ptr<llvm::orc::ObjectLayer> {
+      [&](llvm::orc::ExecutionSession& session) -> std::unique_ptr<llvm::orc::ObjectLayer> {
     auto GetMemMgr = []() { return std::make_unique<llvm::SectionMemoryManager>(); };
     auto ObjLinkingLayer =
         std::make_unique<llvm::orc::RTDyldObjectLinkingLayer>(session, std::move(GetMemMgr));
-    if (triple.isOSBinFormatCOFF()) {
+    if (session.getTargetTriple().isOSBinFormatCOFF()) {
       ObjLinkingLayer->setOverrideObjectFlagsWithResponsibilityFlags(true);
       ObjLinkingLayer->setAutoClaimResponsibilityForObjectSymbols(true);
     }
@@ -539,7 +538,7 @@ void LLVMModuleNode::InitORCJIT() {
                                   .create());
 
   ICHECK(orcjit_ee_ != nullptr) << "Failed to initialize LLVM ORCJIT engine for "
-                                << module_->getTargetTriple();
+                                << module_->getTargetTriple().str();
 
   // store ctors
   auto ctors = llvm::orc::getConstructors(*module_);
@@ -643,7 +642,7 @@ TVM_REGISTER_GLOBAL("codegen.LLVMModuleCreate")
       // Generate a LLVM module from an input target string
       auto module = std::make_unique<llvm::Module>(module_name, *llvm_target->GetContext());
       llvm_target->SetTargetMetadata(module.get());
-      module->setTargetTriple(llvm_target->GetTargetTriple());
+      module->setTargetTriple(llvm::Triple(llvm_target->GetTargetTriple()));
       module->setDataLayout(llvm_target->GetOrCreateTargetMachine()->createDataLayout());
       n->Init(std::move(module), std::move(llvm_instance));
       n->SetJITEngine(llvm_target->GetJITEngine());

@@ -100,7 +100,7 @@ class MetaScheduleTuner {
   const runtime::PackedFunc* normalize_mod_func_;
 };
 
-Pass MetaScheduleApplyDatabase(Optional<String> work_dir, bool enable_warning = false) {
+Pass MetaScheduleApplyDatabase(Optional<String> work_dir, Optional<IRModule> dyn_mod, bool enable_warning = false) {
   using tvm::meta_schedule::Database;
   Target target = Target::Current(false);
   const runtime::PackedFunc* normalize_mod_func_ =
@@ -143,9 +143,22 @@ Pass MetaScheduleApplyDatabase(Optional<String> work_dir, bool enable_warning = 
                 /*error_render_level=*/tir::ScheduleErrorRenderLevel::kDetail);
             meta_schedule::ScheduleUsingAnchorTrace(sch, record->trace, target);
           } else {
-            sch = tir::Schedule::Traced(
+            if(dyn_mod.defined()) {
+              IRModule tmp = dyn_mod.value();
+              base_func = tmp->functions[tmp->global_var_map_[gv->name_hint]];
+              if (const auto* prim_func_node = base_func.as<tir::PrimFuncNode>()) {
+                prim_func = GetRef<tir::PrimFunc>(prim_func_node);
+                tir_mod = (*normalize_mod_func_)(prim_func);
+              }
+              sch = tir::Schedule::Traced(
+                tir_mod, /*seed=*/-1, /*debug_mask=*/0,
+                /*error_render_level=*/tir::ScheduleErrorRenderLevel::kDetail);
+            }
+            else {
+              sch = tir::Schedule::Traced(
                 record->workload->mod, /*seed=*/-1, /*debug_mask=*/0,
                 /*error_render_level=*/tir::ScheduleErrorRenderLevel::kDetail);
+            }
             record->trace->ApplyToSchedule(sch, /*remove_postproc=*/false);
           }
           IRModule new_mod = sch->mod();
@@ -166,7 +179,14 @@ Pass MetaScheduleApplyDatabase(Optional<String> work_dir, bool enable_warning = 
           LOG(WARNING) << "Tuning record is not found for primfunc: " << gv->name_hint;
         }
       }
+      if(dyn_mod.defined()) {
+        IRModule tmp = dyn_mod.value();
+        base_func = tmp->functions[tmp->global_var_map_[gv->name_hint]];
+      }
       result.Set(gv, base_func);
+    }
+    if(dyn_mod.defined()) {
+        mod = dyn_mod.value();
     }
     return IRModule(result,       // functions
                     {},           // type_definitions

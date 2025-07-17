@@ -198,7 +198,7 @@ TVM_REGISTER_GLOBAL("topi.strided_slice").set_body([](TVMArgs args, TVMRetValue*
     }
   } else {
     if (axes.size()) {
-      *rv = dynamic_strided_slice_with_axes(x, begin, end, strides, axes, assume_inbound);
+      *rv = dynamic_strided_slice_with_axes(x, begin, end, strides, axes, assume_inbound, "T_strided_slice_with_axes");
     } else {
       *rv = dynamic_strided_slice(x, begin, end, strides, assume_inbound);
     }
